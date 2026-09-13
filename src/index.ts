@@ -59,6 +59,16 @@ import {
   deleteProjectTokenFromKV,
   summarizeUxFriction,
 } from "./clarity";
+import {
+  resolveDataForSeoAuth,
+  getDataForSeoBacklinksSummary,
+  getDataForSeoBacklinksList,
+  getDataForSeoReferringDomains,
+  getDataForSeoKeywordDifficulty,
+  getDataForSeoSerpWhoIsRanking,
+  getDataForSeoSerpCompetitors,
+  getDataForSeoRankedKeywords,
+} from "./dataforseo";
 
 interface Env {
   // OAuth Client (operator's Google project)
@@ -77,6 +87,11 @@ interface Env {
   // Microsoft Clarity API (optional operator defaults / multi-project JSON map)
   CLARITY_API_TOKEN?: string;
   CLARITY_PROJECT_TOKENS?: string;
+
+  // DataForSEO v3 API (optional operator defaults for Backlinks, KD, SERP)
+  DATAFORSEO_LOGIN?: string;
+  DATAFORSEO_PASSWORD?: string;
+  DATAFORSEO_API_KEY?: string;
 
   // Connector access gate (operator-set; users paste this in the login UI)
   MCP_BEARER_TOKEN: string;
@@ -1366,6 +1381,366 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
         });
       },
     );
+
+    // ── DataForSEO Tools: Backlinks, Keyword Difficulty & SERP Intelligence ─
+
+    this.server.tool(
+      "dataforseo_backlinks_summary",
+      "Fetch domain or URL backlink overview from DataForSEO v3: domain authority rank (0-1000), 0-100 authority score, total backlinks count, referring domains, referring IPs, broken links/pages, dofollow vs nofollow breakdown, and top referring TLDs.",
+      {
+        target: z
+          .string()
+          .describe("Target domain or URL (e.g. 'aiskyla.com' or 'https://example.com/blog/article')."),
+        includeSubdomains: z
+          .boolean()
+          .default(true)
+          .describe("Include backlinks pointing to all subdomains (default: true)."),
+        internalListLimit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(10)
+          .describe("Number of internal links to analyze for anchor context (default: 10)."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key (Base64 login:password) override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const data = await getDataForSeoBacklinksSummary(
+          args.target,
+          {
+            includeSubdomains: args.includeSubdomains,
+            internalListLimit: args.internalListLimit,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+
+    this.server.tool(
+      "dataforseo_backlinks_list",
+      "List individual live backlinks pointing to a target domain or URL from DataForSEO v3 with anchor text, source URL, target URL, dofollow status, authority rank, page/domain rank, spam score, and status.",
+      {
+        target: z
+          .string()
+          .describe("Target domain or URL (e.g. 'aiskyla.com')."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(30)
+          .describe("Number of backlinks to return (default: 30, max: 100)."),
+        mode: z
+          .enum(["as_is", "one_per_domain", "one_per_anchor"])
+          .default("as_is")
+          .describe("Backlink aggregation mode (default: 'as_is')."),
+        orderBy: z
+          .string()
+          .default("rank,desc")
+          .describe("Sort order field and direction (default: 'rank,desc')."),
+        includeSubdomains: z
+          .boolean()
+          .default(true)
+          .describe("Include backlinks to subdomains (default: true)."),
+        dofollowOnly: z
+          .boolean()
+          .default(false)
+          .describe("If true, filters results to return only dofollow backlinks."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const data = await getDataForSeoBacklinksList(
+          args.target,
+          {
+            limit: args.limit,
+            mode: args.mode,
+            orderBy: args.orderBy,
+            includeSubdomains: args.includeSubdomains,
+            dofollowOnly: args.dofollowOnly,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+
+    this.server.tool(
+      "dataforseo_referring_domains",
+      "List referring domains pointing to a target domain or URL from DataForSEO v3 with domain authority rank, backlinks count, referring pages, broken links count, and spam scores.",
+      {
+        target: z
+          .string()
+          .describe("Target domain or URL (e.g. 'aiskyla.com')."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(30)
+          .describe("Number of referring domains to return (default: 30, max: 100)."),
+        orderBy: z
+          .string()
+          .default("rank,desc")
+          .describe("Sort order (default: 'rank,desc')."),
+        includeSubdomains: z
+          .boolean()
+          .default(true)
+          .describe("Include subdomains of the target (default: true)."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const data = await getDataForSeoReferringDomains(
+          args.target,
+          {
+            limit: args.limit,
+            orderBy: args.orderBy,
+            includeSubdomains: args.includeSubdomains,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+
+    this.server.tool(
+      "dataforseo_keyword_difficulty",
+      "Check official DataForSEO 0–100 Keyword Difficulty (KD) scores, difficulty tier ('Very Easy' to 'Very Hard'), and ranking effort estimates for single or bulk keywords.",
+      {
+        keywords: z
+          .union([z.string(), z.array(z.string())])
+          .describe("Single keyword or list of keywords to evaluate (e.g. ['seo tools', 'keyword difficulty'] or 'best ai gifting platform')."),
+        locationName: z
+          .string()
+          .default("United States")
+          .describe("Geographic location name (default: 'United States')."),
+        languageName: z
+          .string()
+          .default("English")
+          .describe("Search language name (default: 'English')."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const kwList = Array.isArray(args.keywords) ? args.keywords : [args.keywords];
+        const data = await getDataForSeoKeywordDifficulty(
+          kwList,
+          {
+            locationName: args.locationName,
+            languageName: args.languageName,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+
+    this.server.tool(
+      "dataforseo_serp_who_is_ranking",
+      "Query live Google organic SERP via DataForSEO v3 to see who is ranking for any keyword: top ranking domains/URLs, titles, snippets, plus detection of AI Overviews, Featured Snippets, People Also Ask, and Reddit/Forum discussions.",
+      {
+        keyword: z
+          .string()
+          .describe("Search query to inspect live Google rankings and competitors for (e.g. 'best ai gifting platform')."),
+        locationName: z
+          .string()
+          .default("United States")
+          .describe("Location name for Google search (default: 'United States')."),
+        languageName: z
+          .string()
+          .default("English")
+          .describe("Language for Google search (default: 'English')."),
+        depth: z
+          .number()
+          .int()
+          .min(10)
+          .max(100)
+          .default(20)
+          .describe("Depth of SERP results to inspect (default: 20, max: 100)."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const data = await getDataForSeoSerpWhoIsRanking(
+          args.keyword,
+          {
+            locationName: args.locationName,
+            languageName: args.languageName,
+            depth: args.depth,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+
+    this.server.tool(
+      "dataforseo_serp_competitors",
+      "Identify top competitor domains ranking across one or multiple search keywords in Google via DataForSEO v3, including average ranking position, rating, visibility, and estimated traffic volume (ETV).",
+      {
+        keywords: z
+          .union([z.string(), z.array(z.string())])
+          .describe("Keyword or list of keywords to identify top competitor domains for."),
+        locationName: z
+          .string()
+          .default("United States")
+          .describe("Location name (default: 'United States')."),
+        languageName: z
+          .string()
+          .default("English")
+          .describe("Language (default: 'English')."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const kwList = Array.isArray(args.keywords) ? args.keywords : [args.keywords];
+        const data = await getDataForSeoSerpCompetitors(
+          kwList,
+          {
+            locationName: args.locationName,
+            languageName: args.languageName,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+
+    this.server.tool(
+      "dataforseo_domain_ranked_keywords",
+      "Discover organic Google search keywords that any target domain or competitor ranks for, including keyword, rank position, ranking URL, search volume, CPC, keyword difficulty (KD), and estimated traffic.",
+      {
+        target: z
+          .string()
+          .describe("Target domain or URL to uncover all ranked keywords for (e.g. 'aiskyla.com' or 'semrush.com')."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .default(50)
+          .describe("Max keywords to return (default: 50, max: 100)."),
+        locationName: z
+          .string()
+          .default("United States")
+          .describe("Location name (default: 'United States')."),
+        languageName: z
+          .string()
+          .default("English")
+          .describe("Language (default: 'English')."),
+        orderBy: z
+          .string()
+          .default("ranked_serp_element.serp_item.rank_group,asc")
+          .describe("Sort order (default: 'ranked_serp_element.serp_item.rank_group,asc')."),
+        login: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO login email override."),
+        password: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO password override."),
+        apiKey: z
+          .string()
+          .optional()
+          .describe("Optional DataForSEO API key override."),
+      },
+      async (args) => {
+        const auth = this.getDataForSeoAuth(args.login, args.password, args.apiKey);
+        const data = await getDataForSeoRankedKeywords(
+          args.target,
+          {
+            limit: args.limit,
+            locationName: args.locationName,
+            languageName: args.languageName,
+            orderBy: args.orderBy,
+          },
+          auth,
+        );
+        return asJsonContent(data);
+      },
+    );
+  }
+
+  private getDataForSeoAuth(
+    loginArg?: string,
+    passwordArg?: string,
+    apiKeyArg?: string,
+  ): string {
+    const login = cleanSecret(loginArg) || cleanSecret(this.env.DATAFORSEO_LOGIN) || undefined;
+    const password = cleanSecret(passwordArg) || cleanSecret(this.env.DATAFORSEO_PASSWORD) || undefined;
+    const apiKey = cleanSecret(apiKeyArg) || cleanSecret(this.env.DATAFORSEO_API_KEY) || undefined;
+
+    return resolveDataForSeoAuth(login, password, apiKey);
   }
 
   private getSerpConfig(

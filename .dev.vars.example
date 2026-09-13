@@ -26,8 +26,15 @@ CLARITY_API_TOKEN=your-clarity-jwt-token
 # Option 2: Multi-project JSON map (alias/domain -> JWT token)
 CLARITY_PROJECT_TOKENS={"aiskyla":"token_1","openrees":"token_2","calorieinsight":"token_3"}
 
+# DataForSEO v3 API Credentials (Optional operator defaults for Backlinks, Keyword Difficulty & SERP Rankings)
+# Register at: https://dataforseo.com (API dashboard: https://app.dataforseo.com)
+DATAFORSEO_LOGIN=your-dataforseo-login-email
+DATAFORSEO_PASSWORD=your-dataforseo-api-password
+DATAFORSEO_API_KEY=base64-encoded-login-colon-password
+
 # Random opaque string used as a connector access gate.
 # Generate with: openssl rand -hex 32
 MCP_BEARER_TOKEN=replace-me-with-a-long-random-secret
+
 
 

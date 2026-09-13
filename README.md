@@ -7,7 +7,16 @@
 
 ## What this gives you
 
-Once deployed, you get a private MCP endpoint that exposes 23 tools to your AI assistant across Search Console, Google Analytics 4, Google Ads Keyword Planner, Google Autocomplete, SERP analysis, and Market Gap Intelligence:
+Once deployed, you get a private MCP endpoint that exposes 30 tools to your AI assistant across Search Console, Google Analytics 4, Google Ads Keyword Planner, Google Autocomplete, SERP analysis, Market Gap Intelligence, and DataForSEO Backlinks & Rankings:
+
+### DataForSEO Intelligence (Backlinks, Keyword Difficulty & Live SERP)
+- `dataforseo_backlinks_summary` — complete domain or URL backlink overview: domain authority rank (0–1000), 0–100 authority score, total backlinks count, referring domains, referring IPs, broken links/pages, dofollow vs nofollow breakdown, and top referring TLDs.
+- `dataforseo_backlinks_list` — list individual backlinks pointing to target domain/URL with anchor text, source URL, target URL, dofollow status, authority rank, page/domain rank, spam score, and status.
+- `dataforseo_referring_domains` — list referring domains pointing to target domain/URL with domain authority rank, backlinks count, referring pages, broken backlinks, and spam scores.
+- `dataforseo_keyword_difficulty` — official DataForSEO 0–100 Keyword Difficulty (KD) scores, difficulty tier ('Very Easy' to 'Very Hard'), and ranking effort estimates for single or bulk keywords.
+- `dataforseo_serp_who_is_ranking` — query live Google organic SERP to see who is ranking for any keyword: top ranking domains/URLs, titles, snippets, plus detection of AI Overviews, Featured Snippets, People Also Ask, and Reddit/Forum discussions.
+- `dataforseo_serp_competitors` — identify top competitor domains ranking across one or multiple search keywords in Google, including average ranking position, rating, visibility, and estimated traffic volume (ETV).
+- `dataforseo_domain_ranked_keywords` — discover organic Google search keywords that any target domain or competitor ranks for, including keyword, rank position, ranking URL, search volume, CPC, keyword difficulty (KD), and estimated traffic.
 
 ### Google Search Console & Opportunity Finder
 - `list_sites` — discover every property accessible to the authenticated user
@@ -128,6 +137,12 @@ npx wrangler secret put GOOGLE_ADS_DEVELOPER_TOKEN
 npx wrangler secret put SERPAPI_API_KEY
 # Fallback (2,500 free queries + $0.001/query):
 npx wrangler secret put SERPER_API_KEY
+
+# Optional: DataForSEO v3 (for Backlinks, Keyword Difficulty & SERP Rankings)
+npx wrangler secret put DATAFORSEO_LOGIN
+npx wrangler secret put DATAFORSEO_PASSWORD
+# Or Base64 combined key:
+npx wrangler secret put DATAFORSEO_API_KEY
 ```
 
 Or via the Cloudflare dashboard : **Workers & Pages** → your worker → **Settings** → **Variables and Secrets** → add each as type **Secret**.

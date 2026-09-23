@@ -162,7 +162,7 @@ function asJsonContent(payload: unknown) {
 export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
   server = new McpServer({
     name: "gsc-mcp-connector",
-    version: "0.4.0",
+    version: "0.4.1",
   });
 
   private async accessToken(): Promise<string> {

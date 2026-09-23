@@ -69,6 +69,9 @@ import {
   getDataForSeoSerpCompetitors,
   getDataForSeoRankedKeywords,
 } from "./dataforseo";
+import {
+  writeSeoContent,
+} from "./writer";
 
 interface Env {
   // OAuth Client (operator's Google project)
@@ -92,6 +95,8 @@ interface Env {
   DATAFORSEO_LOGIN?: string;
   DATAFORSEO_PASSWORD?: string;
   DATAFORSEO_API_KEY?: string;
+  // Anthropic — BodyNutrition SEO Writer
+ANTHROPIC_API_KEY?: string;
 
   // Connector access gate (operator-set; users paste this in the login UI)
   MCP_BEARER_TOKEN: string;
@@ -1727,6 +1732,100 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
           auth,
         );
         return asJsonContent(data);
+      },
+    );
+     this.server.tool(
+      "write_seo_content",
+      "Generate SEO content for BodyNutrition using the verified SEO Radar brief. Use only for INTEGRARE or RISCRIVERE decisions. The Writer does not publish content.",
+      {
+        language: z.string(),
+        market: z.string(),
+
+        pageType: z.enum([
+          "category",
+          "product",
+          "magazine",
+          "landing",
+        ]),
+
+        pageId: z.string().optional(),
+        url: z.string().optional(),
+
+        decision: z.enum([
+          "INTEGRARE",
+          "RISCRIVERE",
+        ]),
+
+        searchIntent: z.string(),
+        primaryKeyword: z.string(),
+
+        secondaryKeywords: z
+          .array(z.string())
+          .optional(),
+
+        verifiedCatalogFacts: z
+          .array(z.string())
+          .optional(),
+
+        verifiedInternalLinks: z
+          .array(
+            z.object({
+              label: z.string(),
+              url: z.string(),
+              type: z
+                .enum([
+                  "shop_category",
+                  "magazine_category",
+                  "magazine_article",
+                  "product",
+                  "landing",
+                  "other",
+                ])
+                .optional(),
+              context: z.string().optional(),
+            }),
+          )
+          .optional(),
+
+        existingContent: z.string().optional(),
+
+        contentToPreserve: z
+          .array(z.string())
+          .optional(),
+
+        seoEvidence: z
+          .array(z.string())
+          .optional(),
+
+        instructions: z.string().optional(),
+      },
+
+      async (args) => {
+        try {
+          const apiKey =
+            this.env.ANTHROPIC_API_KEY?.trim();
+
+          if (!apiKey) {
+            throw new Error(
+              "ANTHROPIC_API_KEY is not configured.",
+            );
+          }
+
+          const result =
+            await writeSeoContent(
+              apiKey,
+              args,
+            );
+
+          return asJsonContent(result);
+        } catch (error) {
+          return asJsonContent({
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          });
+        }
       },
     );
   }

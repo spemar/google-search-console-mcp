@@ -771,6 +771,9 @@ export async function writeSeoContent(
 }> {
   const apiKey = cleanApiKey(apiKeyRaw);
 
+  const selectedModel =
+    model?.trim() || DEFAULT_MODEL;
+
   if (!apiKey) {
     throw new Error(
       "ANTHROPIC_API_KEY is not configured.",
@@ -814,7 +817,7 @@ export async function writeSeoContent(
       },
 
       body: JSON.stringify({
-        model,
+        model: selectedModel,
 
         max_tokens: 6000,
 
@@ -898,7 +901,7 @@ export async function writeSeoContent(
 
     model:
       data.model ??
-      model,
+      selectedModel,
 
     content,
 

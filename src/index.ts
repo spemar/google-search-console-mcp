@@ -1740,6 +1740,7 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
       {
         language: z.string(),
         market: z.string(),
+        model: z.string().optional(),
 
         pageType: z.enum([
           "category",
@@ -1810,12 +1811,13 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
               "ANTHROPIC_API_KEY is not configured.",
             );
           }
-
+          const { model, ...writerInput } = args;
           const result =
-            await writeSeoContent(
-              apiKey,
-              args,
-            );
+          await writeSeoContent(
+          apiKey,
+          writerInput,
+          model,
+        );
 
           return asJsonContent(result);
         } catch (error) {

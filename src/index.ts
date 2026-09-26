@@ -1745,6 +1745,7 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
         pageType: z.enum([
           "category",
           "product",
+          "manufacturer",
           "magazine",
           "landing",
         ]),
@@ -1779,6 +1780,7 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
                   "magazine_category",
                   "magazine_article",
                   "product",
+                  "manufacturer",
                   "landing",
                   "other",
                 ])
@@ -1799,6 +1801,43 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
           .optional(),
 
         instructions: z.string().optional(),
+
+        priorFingerprints: z
+          .array(
+            z.object({
+              entity_type: z
+                .enum([
+                  "category",
+                  "product",
+                  "manufacturer",
+                  "magazine",
+                  "landing",
+                ])
+                .optional(),
+              entity_id: z.string().optional(),
+              language: z.string().optional(),
+              market: z.string().optional(),
+              cluster: z.string().optional(),
+              opening: z.string(),
+              h2_structure: z.array(z.string()),
+              editorial_angle: z.string(),
+              cta_patterns: z.array(z.string()),
+              faq_topics: z.array(z.string()),
+              structure_type: z.string(),
+              catalog_evidence_used: z.array(z.string()),
+              serp_gap_used: z.string(),
+              writer_model: z.string().optional(),
+              published_at: z.string().optional(),
+            }),
+          )
+          .optional(),
+
+        cluster: z.string().optional(),
+        proposedEditorialAngle: z.string().optional(),
+        serpGap: z.string().optional(),
+        catalogEvidence: z
+          .array(z.string())
+          .optional(),
       },
 
       async (args) => {

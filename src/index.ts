@@ -1736,7 +1736,7 @@ export class GSCMCP extends McpAgent<Env, unknown, GrantProps> {
     );
      this.server.tool(
       "write_seo_content",
-      "Generate SEO content for BodyNutrition using the verified SEO Radar brief. Use only for INTEGRARE or RISCRIVERE decisions. The Writer does not publish content.",
+      "[PHASE1-20260926] Generate SEO content for BodyNutrition using the verified SEO Radar brief. Use only for INTEGRARE or RISCRIVERE decisions. The Writer does not publish content.",
       {
         language: z.string(),
         market: z.string(),

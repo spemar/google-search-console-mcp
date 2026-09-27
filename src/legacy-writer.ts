@@ -1,90 +1,16 @@
-export type WriterPageType =
-  | "category"
-  | "product"
-  | "magazine"
-  | "landing";
+import type {
+  SeoWriterInput,
+  SeoWriterOutput,
+} from "./types";
 
-export type WriterDecision =
-  | "INTEGRARE"
-  | "RISCRIVERE";
-
-export interface VerifiedInternalLink {
-  label: string;
-  url: string;
-  type?:
-    | "shop_category"
-    | "magazine_category"
-    | "magazine_article"
-    | "product"
-    | "landing"
-    | "other";
-  context?: string;
-}
-
-export interface SeoWriterInput {
-  language: string;
-  market: string;
-
-  pageType: WriterPageType;
-
-  pageId?: string;
-  url?: string;
-
-  decision: WriterDecision;
-
-  searchIntent: string;
-
-  primaryKeyword: string;
-  secondaryKeywords?: string[];
-
-  /**
-   * Facts verified by Radar through trusted sources such as
-   * PrestaShop MCP or other authoritative project data.
-   *
-   * ONLY these may be treated as confirmed facts about the
-   * BodyNutrition catalog/page/products.
-   */
-  verifiedCatalogFacts?: string[];
-
-  /**
-   * URLs verified before calling the Writer.
-   * Claude may choose whether and where to use them,
-   * but must never invent URLs.
-   */
-  verifiedInternalLinks?: VerifiedInternalLink[];
-
-  /**
-   * Current page content.
-   *
-   * IMPORTANT:
-   * Existing content is context, not automatically verified truth.
-   */
-  existingContent?: string;
-
-  /**
-   * Semantic/factual elements that Radar explicitly wants preserved.
-   */
-  contentToPreserve?: string[];
-
-  /**
-   * GSC, SERP, DataForSEO or other SEO evidence selected by Radar.
-   * This guides writing strategy but is NOT catalog evidence.
-   */
-  seoEvidence?: string[];
-
-  /**
-   * Page-specific instructions produced by Radar/ChatGPT.
-   */
-  instructions?: string;
-}
-
-export interface SeoWriterOutput {
-  meta_title: string;
-  meta_description: string;
-  main_description: string;
-  additional_description: string;
-  warnings: string[];
-}
+/**
+ * Legacy Writer used temporarily for:
+ * - product
+ * - magazine
+ * - landing
+ *
+ * Category content is handled by the dedicated Category Writer.
+ */
 
 interface AnthropicResponse {
   id?: string;
@@ -754,6 +680,41 @@ Return only the required structured output.
 `;
 }
 
+/**
+ * Parse Anthropic structured output defensively.
+ *
+ * Anthropic structured output should normally contain pure JSON.
+ * This fallback also tolerates accidental Markdown JSON fences and
+ * produces a useful diagnostic if parsing fails.
+ */
+function parseStructuredOutput(
+  raw: string,
+): SeoWriterOutput {
+  let structuredText = raw.trim();
+
+  // Defensive fallback for ```json ... ``` or ``` ... ```
+  if (structuredText.startsWith("```")) {
+    structuredText = structuredText
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
+  try {
+    const parsed =
+      JSON.parse(structuredText) as SeoWriterOutput;
+
+    return parsed;
+  } catch {
+    throw new Error(
+      `Anthropic structured output could not be parsed. Raw output: ${raw.slice(
+        0,
+        1000,
+      )}`,
+    );
+  }
+}
+
 export async function writeSeoContentLegacy(
   apiKeyRaw: string,
   input: SeoWriterInput,
@@ -860,7 +821,10 @@ export async function writeSeoContentLegacy(
       JSON.parse(rawText) as AnthropicResponse;
   } catch {
     throw new Error(
-      "Anthropic returned an invalid API response.",
+      `Anthropic returned an invalid API response. Raw response: ${rawText.slice(
+        0,
+        1000,
+      )}`,
     );
   }
 
@@ -879,22 +843,15 @@ export async function writeSeoContentLegacy(
 
   if (!textBlock?.text) {
     throw new Error(
-      "Anthropic returned no structured text content.",
+      `Anthropic returned no structured text content. Raw API response: ${rawText.slice(
+        0,
+        1000,
+      )}`,
     );
   }
 
-  let content: SeoWriterOutput;
-
-  try {
-    content =
-      JSON.parse(
-        textBlock.text,
-      ) as SeoWriterOutput;
-  } catch {
-    throw new Error(
-      "Anthropic structured output could not be parsed.",
-    );
-  }
+  const content =
+    parseStructuredOutput(textBlock.text);
 
   return {
     provider: "anthropic",

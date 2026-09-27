@@ -780,7 +780,7 @@ export async function writeSeoContentLegacy(
       body: JSON.stringify({
         model: selectedModel,
 
-        max_tokens: 6000,
+        max_tokens: 12000,
 
         system: SYSTEM_PROMPT,
 
@@ -833,6 +833,13 @@ export async function writeSeoContentLegacy(
       "Anthropic refused the Writer request.",
     );
   }
+  if (data.stop_reason === "max_tokens") {
+  throw new Error(
+    `Anthropic output was truncated because max_tokens was reached. ` +
+    `Increase max_tokens or reduce the requested output size. ` +
+    `Model: ${data.model ?? selectedModel}.`,
+  );
+}
 
   const textBlock =
     data.content?.find(

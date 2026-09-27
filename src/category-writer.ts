@@ -8,7 +8,10 @@ interface AnthropicResponse {
   model?: string;
   stop_reason?: string;
   content?: Array<{ type: string; text?: string }>;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
 }
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -69,36 +72,63 @@ const CATEGORY_OUTPUT_SCHEMA = {
     meta_description: { type: "string" },
     main_description: { type: "string" },
     additional_description: { type: "string" },
-    warnings: { type: "array", items: { type: "string" } },
+    warnings: {
+      type: "array",
+      items: { type: "string" },
+    },
     fingerprint: {
       type: "object",
       properties: {
         opening: { type: "string" },
-        h2_structure: { type: "array", items: { type: "string" } },
+        h2_structure: {
+          type: "array",
+          items: { type: "string" },
+        },
         editorial_angle: { type: "string" },
-        cta_patterns: { type: "array", items: { type: "string" } },
-        faq_topics: { type: "array", items: { type: "string" } },
+        cta_patterns: {
+          type: "array",
+          items: { type: "string" },
+        },
+        faq_topics: {
+          type: "array",
+          items: { type: "string" },
+        },
         structure_type: { type: "string" },
-        catalog_evidence_used: { type: "array", items: { type: "string" } },
-        serp_gap_used: { type: "string" }
+        catalog_evidence_used: {
+          type: "array",
+          items: { type: "string" },
+        },
+        serp_gap_used: { type: "string" },
       },
       required: [
-        "opening", "h2_structure", "editorial_angle", "cta_patterns",
-        "faq_topics", "structure_type", "catalog_evidence_used", "serp_gap_used"
+        "opening",
+        "h2_structure",
+        "editorial_angle",
+        "cta_patterns",
+        "faq_topics",
+        "structure_type",
+        "catalog_evidence_used",
+        "serp_gap_used",
       ],
-      additionalProperties: false
-    }
+      additionalProperties: false,
+    },
   },
   required: [
-    "meta_title", "meta_description", "main_description",
-    "additional_description", "warnings", "fingerprint"
+    "meta_title",
+    "meta_description",
+    "main_description",
+    "additional_description",
+    "warnings",
+    "fingerprint",
   ],
-  additionalProperties: false
+  additionalProperties: false,
 };
 
 function cleanApiKey(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.replace(/^[\uFEFF\u200B-\u200D\uFEFF]/g, "")
+
+  return value
+    .replace(/^[\uFEFF\u200B-\u200D\uFEFF]/g, "")
     .replace(/[\r\n]/g, "")
     .replace(/^["']|["']$/g, "")
     .trim();
@@ -164,18 +194,45 @@ export async function writeCategoryContent(
   provider: "anthropic";
   model: string;
   content: SeoWriterOutput;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
 }> {
   const apiKey = cleanApiKey(apiKeyRaw);
   const selectedModel = model?.trim() || DEFAULT_MODEL;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured.");
-  if (input.pageType !== "category") throw new Error("Category Writer only accepts pageType=category.");
-  if (!input.language?.trim()) throw new Error("language is required.");
-  if (!input.market?.trim()) throw new Error("market is required.");
-  if (!input.searchIntent?.trim()) throw new Error("searchIntent is required.");
-  if (!input.primaryKeyword?.trim()) throw new Error("primaryKeyword is required.");
-  if (input.decision !== "INTEGRARE" && input.decision !== "RISCRIVERE") {
-    throw new Error("Writer may only be called for INTEGRARE or RISCRIVERE.");
+
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not configured.");
+  }
+
+  if (input.pageType !== "category") {
+    throw new Error("Category Writer only accepts pageType=category.");
+  }
+
+  if (!input.language?.trim()) {
+    throw new Error("language is required.");
+  }
+
+  if (!input.market?.trim()) {
+    throw new Error("market is required.");
+  }
+
+  if (!input.searchIntent?.trim()) {
+    throw new Error("searchIntent is required.");
+  }
+
+  if (!input.primaryKeyword?.trim()) {
+    throw new Error("primaryKeyword is required.");
+  }
+
+  if (
+    input.decision !== "INTEGRARE" &&
+    input.decision !== "RISCRIVERE"
+  ) {
+    throw new Error(
+      "Writer may only be called for INTEGRARE or RISCRIVERE.",
+    );
   }
 
   const response = await fetch(ANTHROPIC_API_URL, {
@@ -189,42 +246,210 @@ export async function writeCategoryContent(
       model: selectedModel,
       max_tokens: 7000,
       system: CATEGORY_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildCategoryPrompt(input) }],
+      messages: [
+        {
+          role: "user",
+          content: buildCategoryPrompt(input),
+        },
+      ],
       output_config: {
         effort: "medium",
-        format: { type: "json_schema", schema: CATEGORY_OUTPUT_SCHEMA },
+        format: {
+          type: "json_schema",
+          schema: CATEGORY_OUTPUT_SCHEMA,
+        },
       },
     }),
   });
 
   const rawText = await response.text();
+
   if (!response.ok) {
-    throw new Error(`Anthropic API error ${response.status}: ${rawText.slice(0, 1500)}`);
+    throw new Error(
+      `Anthropic API error ${response.status}: ${rawText.slice(0, 1500)}`,
+    );
   }
 
   let data: AnthropicResponse;
-  try { data = JSON.parse(rawText) as AnthropicResponse; }
-  catch { throw new Error("Anthropic returned an invalid API response."); }
-  if (data.stop_reason === "refusal") throw new Error("Anthropic refused the Category Writer request.");
 
+  try {
+    data = JSON.parse(rawText) as AnthropicResponse;
+  } catch {
+    throw new Error(
+      "Anthropic returned an invalid API response.",
+    );
+  }
+
+  /*
+   * Diagnostic logging.
+   *
+   * This is intentionally logged before accepting the generated content
+   * so unexpected Anthropic termination reasons can be diagnosed.
+   */
+  console.log("Category Writer Anthropic response:", {
+    model: data.model ?? selectedModel,
+    stop_reason: data.stop_reason ?? "missing",
+    input_tokens: data.usage?.input_tokens ?? "unknown",
+    output_tokens: data.usage?.output_tokens ?? "unknown",
+  });
+
+  /*
+   * Never accept a response that Anthropic explicitly refused.
+   */
+  if (data.stop_reason === "refusal") {
+    throw new Error(
+      "Anthropic refused the Category Writer request.",
+    );
+  }
+
+  /*
+   * Critical truncation guard.
+   *
+   * A structured JSON response can still be syntactically valid even when
+   * the actual editorial content has been cut short. Never allow a
+   * max_tokens response to reach the publishing workflow.
+   */
+  if (data.stop_reason === "max_tokens") {
+    throw new Error(
+      `Anthropic Category Writer output was truncated because max_tokens was reached. ` +
+      `Model: ${data.model ?? selectedModel}. ` +
+      `Output tokens: ${data.usage?.output_tokens ?? "unknown"}.`,
+    );
+  }
+
+  /*
+   * At present, a normally completed Category Writer response must finish
+   * with end_turn.
+   *
+   * If Anthropic introduces or returns another termination reason, fail
+   * safely instead of silently accepting potentially incomplete content.
+   */
+  if (
+    data.stop_reason &&
+    data.stop_reason !== "end_turn"
+  ) {
+    throw new Error(
+      `Anthropic Category Writer stopped unexpectedly: ${data.stop_reason}.`,
+    );
+  }
+
+  /*
+   * Missing stop_reason is also suspicious.
+   *
+   * We log it above, but do not reject it yet because this preserves
+   * compatibility in case the API omits the field in a valid response.
+   */
   const textBlock = data.content?.find(
-    (block) => block.type === "text" && typeof block.text === "string",
+    (block) =>
+      block.type === "text" &&
+      typeof block.text === "string",
   );
-  if (!textBlock?.text) throw new Error("Anthropic returned no structured text content.");
+
+  if (!textBlock?.text) {
+    throw new Error(
+      "Anthropic returned no structured text content.",
+    );
+  }
 
   let content: SeoWriterOutput;
-  try { content = JSON.parse(textBlock.text) as SeoWriterOutput; }
-  catch { throw new Error("Anthropic structured output could not be parsed."); }
 
-  const fp = content.fingerprint as ContentFingerprint | undefined;
-  if (fp) {
-    fp.entity_type = "category";
-    fp.entity_id = input.pageId;
-    fp.language = input.language;
-    fp.market = input.market;
-    fp.cluster = input.cluster;
-    fp.writer_model = data.model ?? selectedModel;
+  try {
+    content = JSON.parse(
+      textBlock.text,
+    ) as SeoWriterOutput;
+  } catch {
+    throw new Error(
+      "Anthropic structured output could not be parsed.",
+    );
   }
+
+  /*
+   * Basic structured-content safety checks.
+   *
+   * The JSON schema should already enforce these fields upstream,
+   * but checking them here prevents an anomalous API response from
+   * silently entering the publishing workflow.
+   */
+  if (
+    !content.meta_title?.trim() ||
+    !content.meta_description?.trim() ||
+    !content.main_description?.trim() ||
+    !content.additional_description?.trim()
+  ) {
+    throw new Error(
+      "Anthropic Category Writer returned incomplete required content fields.",
+    );
+  }
+
+  /*
+   * BodyNutrition-specific field-mapping guard.
+   *
+   * additional_description must remain the short block ABOVE products.
+   * We deliberately reject obvious structural violations instead of
+   * silently publishing an inverted or malformed category layout.
+   */
+  const additionalDescription =
+    content.additional_description.trim();
+
+  const additionalParagraphMatches =
+    additionalDescription.match(/<p(?:\s[^>]*)?>[\s\S]*?<\/p>/gi) ?? [];
+
+  if (
+    additionalParagraphMatches.length !== 1 ||
+    additionalDescription !== additionalParagraphMatches[0].trim() ||
+    /<h[1-6]\b/i.test(additionalDescription) ||
+    /<(ul|ol|li|strong)\b/i.test(additionalDescription)
+  ) {
+    throw new Error(
+      "Category Writer returned an invalid additional_description. " +
+      "It must be exactly one concise <p>...</p> with no heading, list or <strong>.",
+    );
+  }
+
+  /*
+   * Category pages must not contain an H1 inside main_description because
+   * PrestaShop already renders the category H1.
+   */
+  if (/<h1\b/i.test(content.main_description)) {
+    throw new Error(
+      "Category Writer returned an H1 inside main_description.",
+    );
+  }
+
+  /*
+   * FAQ are mandatory for category pages according to the Category Writer
+   * contract. Use the generated fingerprint as an additional structural
+   * check rather than guessing FAQ wording from the HTML.
+   */
+  const fp =
+    content.fingerprint as ContentFingerprint | undefined;
+
+  if (!fp) {
+    throw new Error(
+      "Category Writer returned no editorial fingerprint.",
+    );
+  }
+
+  if (
+    !Array.isArray(fp.faq_topics) ||
+    fp.faq_topics.length === 0
+  ) {
+    throw new Error(
+      "Category Writer returned no FAQ topics even though FAQ are mandatory.",
+    );
+  }
+
+  /*
+   * Enrich the fingerprint with BodyNutrition editorial-memory metadata.
+   * These fields are not generated by Claude because they come from the
+   * trusted execution context.
+   */
+  fp.entity_type = "category";
+  fp.entity_id = input.pageId;
+  fp.language = input.language;
+  fp.market = input.market;
+  fp.cluster = input.cluster;
+  fp.writer_model = data.model ?? selectedModel;
 
   return {
     provider: "anthropic",
